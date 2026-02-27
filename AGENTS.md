@@ -26,7 +26,12 @@ February 2026
 
 ### Конфигурация
 
-MCP сервер доступен по адресу `http://fintrack.test/mcp` с авторизацией через Sanctum Bearer Token.
+| Среда | URL |
+|-------|-----|
+| Продакшн | `https://api.equity.su/mcp` |
+| Локальная | `http://fintrack.test/mcp` |
+
+Авторизация через Sanctum Bearer Token.
 
 ### Паттерн Prepare/Create
 
@@ -416,7 +421,64 @@ AI: [вызывает delete-transaction с transaction_id: 42]
 
 ---
 
-## 7. Разработка новых Tools
+## 7. Projects (Проекты)
+
+### list-projects
+
+Получить все проекты пользователя.
+
+**Параметры:** нет
+
+### get-project
+
+Получить детали проекта.
+
+**Параметры:**
+- `id` (required, integer) - ID проекта
+
+### prepare-project
+
+Валидация перед созданием.
+
+**Параметры:**
+- `name` (required, string) - Название проекта
+- `description` (optional, string) - Описание
+- `color` (optional, string) - Цвет в HEX: #FF5733
+- `currency` (optional, string) - ISO 4217: RUB, USD, EUR
+- `budget` (optional, number) - Бюджет
+- `start_date` (optional, string) - Дата начала YYYY-MM-DD
+- `end_date` (optional, string) - Дата окончания YYYY-MM-DD
+- `parent_id` (optional, integer) - ID родительского проекта (подпроект)
+
+### create-project
+
+Создать проект (после prepare-project).
+
+### update-project
+
+Обновить проект.
+
+**Параметры:**
+- `project_id` (required, integer) - ID проекта
+- `name` (optional, string)
+- `description` (optional, string)
+- `color` (optional, string)
+- `currency` (optional, string)
+- `budget` (optional, number)
+- `start_date` (optional, string)
+- `end_date` (optional, string)
+- `status` (optional, string) - статус проекта
+
+### delete-project
+
+Удалить проект.
+
+**Параметры:**
+- `project_id` (required, integer) - ID проекта
+
+---
+
+## 8. Разработка новых Tools
 
 ### Структура файлов
 
@@ -536,18 +598,23 @@ public int $defaultPaginationLength = 50;
 ### Проверка количества доступных tools
 
 ```bash
-curl -s -X POST http://fintrack.test/mcp \
+# Продакшн
+MCP_URL="https://api.equity.su/mcp"
+# Локальная
+# MCP_URL="http://fintrack.test/mcp"
+
+curl -s -X POST $MCP_URL \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
   | jq '.result.tools | length'
-# Ожидаем: 30
+# Ожидаем: 36
 ```
 
 ### Тестовый вызов
 
 ```bash
-curl -s -X POST http://fintrack.test/mcp \
+curl -s -X POST https://api.equity.su/mcp \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
