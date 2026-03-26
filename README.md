@@ -1,7 +1,7 @@
-# Equity.ru MCP Skill
+# Equity MCP Skill
 
 AI-скилл для управления личными финансами через [Model Context Protocol](https://modelcontextprotocol.io/) (MCP).
-Предоставляет **58 инструментов** для работы с финансовыми данными в приложении [Equity](https://equity.su).
+Предоставляет **70 инструментов** для работы с финансовыми данными в приложении [Equity](https://equity.su).
 
 ---
 
@@ -10,7 +10,7 @@ AI-скилл для управления личными финансами че
 | Файл | Описание |
 |------|----------|
 | `SKILL.md` | Краткая справка: сущности, паттерны, типы данных |
-| `AGENTS.md` | Полное руководство: все 58 инструментов с параметрами и примерами |
+| `AGENTS.md` | Полное руководство: все 70 инструментов с параметрами и примерами |
 
 ## Сущности и инструменты
 
@@ -19,13 +19,17 @@ AI-скилл для управления личными финансами че
 | Accounts | Банковские счета, карты, наличные | 6 |
 | Categories | Категории доходов и расходов | 6 |
 | Transactions | Финансовые операции, дубликаты, переводы | 8 |
-| Recurrings | Повторяющиеся платежи (пауза, возобновление, вхождения) | 9 |
+| Recurrings | Повторяющиеся платежи (пауза, возобновление) | 9 |
+| Occurrences | Плановые платежи: расписание, статусы, группировка | 4 |
+| Overrides | Пропуск или перенос конкретных вхождений | 3 |
+| Links | Привязка транзакций к повторяющимся платежам | 2 |
 | Tags | Метки для организации | 6 |
 | Projects | Проекты и подпроекты | 6 |
 | Metrics | Автоматические метрики проекта | 5 |
 | Indicators | Вычисляемые показатели по формулам | 7 |
 | Manual Metrics | Ручные метрики пользователя | 2 |
 | Dashboard | Статистика и обзор | 1 |
+| Pivot | Аналитические сводные таблицы | 3 |
 | Currencies | Доступные валюты | 1 |
 | Suggestions | Автозаполнение | 1 |
 
@@ -34,7 +38,6 @@ AI-скилл для управления личными финансами че
 | Среда | URL |
 |-------|-----|
 | Продакшн | `https://api.equity.su/mcp` |
-| Локальная | `http://fintrack.test/mcp` |
 
 Авторизация: Sanctum Bearer Token.
 
@@ -58,17 +61,17 @@ MIT
 
 ---
 
-# Equity.ru MCP Skill (English)
+# Equity MCP Skill (English)
 
 AI skill for personal finance management via [Model Context Protocol](https://modelcontextprotocol.io/) (MCP).
-Provides **58 tools** for working with financial data in the [Equity](https://equity.su) app.
+Provides **70 tools** for working with financial data in the [Equity](https://equity.su) app.
 
 ## Structure
 
 | File | Description |
 |------|-------------|
 | `SKILL.md` | Quick reference: entities, patterns, data types |
-| `AGENTS.md` | Full guide: all 58 tools with parameters and examples |
+| `AGENTS.md` | Full guide: all 70 tools with parameters and examples |
 
 ## Entities and Tools
 
@@ -77,13 +80,17 @@ Provides **58 tools** for working with financial data in the [Equity](https://eq
 | Accounts | Bank accounts, cards, cash | 6 |
 | Categories | Income and expense categories | 6 |
 | Transactions | Financial operations, duplicates, transfers | 8 |
-| Recurrings | Recurring payments (pause, resume, occurrences) | 9 |
+| Recurrings | Recurring payments (pause, resume) | 9 |
+| Occurrences | Planned payment schedule, statuses, grouping | 4 |
+| Overrides | Skip or reschedule specific occurrences | 3 |
+| Links | Link transactions to recurring payments | 2 |
 | Tags | Labels for organization | 6 |
 | Projects | Projects and subprojects | 6 |
 | Metrics | Automatic project metrics | 5 |
 | Indicators | Computed indicators via formulas | 7 |
 | Manual Metrics | User-defined manual metrics | 2 |
 | Dashboard | Statistics and overview | 1 |
+| Pivot | Analytics pivot tables | 3 |
 | Currencies | Available currencies | 1 |
 | Suggestions | Autocomplete | 1 |
 
@@ -92,7 +99,6 @@ Provides **58 tools** for working with financial data in the [Equity](https://eq
 | Environment | URL |
 |-------------|-----|
 | Production | `https://api.equity.su/mcp` |
-| Local | `http://fintrack.test/mcp` |
 
 Authorization: Sanctum Bearer Token.
 

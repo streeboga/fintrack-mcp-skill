@@ -1,12 +1,12 @@
-# FinTrack MCP Server - Полное Руководство
+# Equity MCP Server - Полное Руководство
 
-**Version 1.1.0**
-FinTrack
-February 2026
+**Version 1.3.0**
+Equity
+March 2026
 
 > **Примечание:**
-> Этот документ предназначен для AI агентов и LLM при работе с MCP сервером FinTrack.
-> Содержит детальные примеры использования всех 58 инструментов.
+> Этот документ предназначен для AI агентов и LLM при работе с MCP сервером Equity.
+> Содержит детальные примеры использования всех 70 инструментов.
 
 ---
 
@@ -17,12 +17,18 @@ February 2026
 3. [Categories (Категории)](#3-categories-категории)
 4. [Transactions (Транзакции)](#4-transactions-транзакции)
 5. [Recurring Payments (Повторяющиеся платежи)](#5-recurring-payments-повторяющиеся-платежи)
-6. [Tags (Теги)](#6-tags-теги)
-7. [Projects (Проекты)](#7-projects-проекты)
-8. [Metrics (Метрики)](#8-metrics-метрики)
-9. [Indicators (Показатели)](#9-indicators-показатели)
-10. [Manual Metrics (Ручные метрики)](#10-manual-metrics-ручные-метрики)
-11. [Разработка новых Tools](#11-разработка-новых-tools)
+6. [Occurrences (Плановые платежи)](#6-occurrences-плановые-платежи)
+7. [Occurrence Overrides (Пропуск/перенос)](#7-occurrence-overrides-пропускперенос)
+8. [Links (Привязка транзакций)](#8-links-привязка-транзакций)
+9. [Tags (Теги)](#9-tags-теги)
+10. [Projects (Проекты)](#10-projects-проекты)
+11. [Dashboard (Статистика)](#11-dashboard-статистика)
+12. [Pivot (Аналитика)](#12-pivot-аналитика)
+13. [Metrics (Метрики)](#13-metrics-метрики)
+14. [Indicators (Показатели)](#14-indicators-показатели)
+15. [Manual Metrics (Ручные метрики)](#15-manual-metrics-ручные-метрики)
+16. [Currencies & Suggestions](#16-currencies--suggestions)
+17. [Разработка новых Tools](#17-разработка-новых-tools)
 
 ---
 
@@ -33,7 +39,6 @@ February 2026
 | Среда | URL |
 |-------|-----|
 | Продакшн | `https://api.equity.su/mcp` |
-| Локальная | `http://fintrack.test/mcp` |
 
 Авторизация через Sanctum Bearer Token.
 
@@ -86,6 +91,13 @@ User: Да
 AI: [вызывает delete-transaction с transaction_id: 42]
     ✓ Транзакция удалена.
 ```
+
+### Формат данных
+
+- **Даты**: ISO 8601 (YYYY-MM-DD)
+- **Суммы в occurrences/pivot**: в копейках/центах (integer). 150000 = 1500.00 RUB
+- **Суммы в остальных tools**: в основной валюте (рублях). НЕ в копейках
+- **Валюты**: ISO 4217 (RUB, USD, EUR)
 
 ---
 
@@ -306,6 +318,24 @@ AI: [вызывает delete-transaction с transaction_id: 42]
 **Параметры:**
 - `transaction_id` (required, integer) - ID транзакции
 
+### duplicate-transaction
+
+Дублировать существующую транзакцию.
+
+**Параметры:**
+- `transaction_id` (required, integer) - ID транзакции для дублирования
+
+### transfer-funds
+
+Перевод между счетами. Поддерживает кросс-валютные переводы с автоматическим расчётом курса.
+
+**Параметры:**
+- `from_account_id` (required, integer) - ID счета-источника
+- `to_account_id` (required, integer) - ID счета-получателя
+- `amount` (required, number) - Сумма перевода
+- `description` (optional, string) - Описание
+- `transaction_date` (optional, string) - Дата YYYY-MM-DD
+
 ---
 
 ## 5. Recurring Payments (Повторяющиеся платежи)
@@ -378,9 +408,277 @@ AI: [вызывает delete-transaction с transaction_id: 42]
 **Параметры:**
 - `recurring_id` (required, integer) - ID платежа
 
+### pause-recurring
+
+Приостановить повторяющийся платеж.
+
+**Параметры:**
+- `recurring_id` (required, integer) - ID платежа
+
+### resume-recurring
+
+Возобновить приостановленный платеж.
+
+**Параметры:**
+- `recurring_id` (required, integer) - ID платежа
+
+### get-recurring-occurrences
+
+Получить запланированные вхождения конкретного повторяющегося платежа.
+
+**Параметры:**
+- `recurring_id` (required, integer) - ID платежа
+- `from` (optional, string) - Дата начала (YYYY-MM-DD)
+- `to` (optional, string) - Дата окончания (YYYY-MM-DD)
+
 ---
 
-## 6. Tags (Теги)
+## 6. Occurrences (Плановые платежи)
+
+Occurrences — вхождения повторяющихся платежей за период. Показывают статус оплаты, суммы, категории и счета. Используются для план/факт анализа.
+
+### list-occurrences
+
+Все вхождения за период со статусами оплаты.
+
+**Параметры:**
+- `from` (required, string) - Дата начала (YYYY-MM-DD)
+- `to` (required, string) - Дата окончания (YYYY-MM-DD)
+- `recurring_id` (optional, integer) - Фильтр по ID повторяющегося платежа
+- `type` (optional, string) - Фильтр по типу: expense, income, transfer
+- `is_paid` (optional, boolean) - Фильтр: true = оплачено, false = не оплачено
+- `category_id` (optional, integer) - Фильтр по категории
+- `account_id` (optional, integer) - Фильтр по счету
+
+**Пример ответа:**
+```json
+{
+  "data": [...],
+  "total": 15,
+  "period": { "from": "2026-03-01", "to": "2026-03-31" }
+}
+```
+
+**Пример использования:**
+```
+User: Какие платежи запланированы на март?
+AI: [вызывает list-occurrences с from: "2026-03-01", to: "2026-03-31"]
+    Показывает список с разделением на оплаченные/неоплаченные
+```
+
+### get-occurrences-totals
+
+Агрегация: запланировано/оплачено/не оплачено по типам.
+
+**Параметры:**
+- `from` (required, string) - Дата начала (YYYY-MM-DD)
+- `to` (required, string) - Дата окончания (YYYY-MM-DD)
+- `type` (optional, string) - Фильтр: expense или income
+- `project_id` (optional, integer) - Фильтр по проекту
+
+**Пример ответа:**
+```json
+{
+  "planned_income": 500000,
+  "planned_expense": 350000,
+  "paid_income": 500000,
+  "paid_expense": 200000,
+  "unpaid_income": 0,
+  "unpaid_expense": 150000,
+  "currency": "RUB"
+}
+```
+
+**Пример использования:**
+```
+User: Сколько я должен заплатить в этом месяце?
+AI: [вызывает get-occurrences-totals с type: "expense"]
+    Запланировано расходов: 3500 ₽
+    Оплачено: 2000 ₽
+    Осталось оплатить: 1500 ₽
+```
+
+### get-occurrences-by-category
+
+Группировка вхождений по категориям.
+
+**Параметры:**
+- `from` (required, string) - Дата начала (YYYY-MM-DD)
+- `to` (required, string) - Дата окончания (YYYY-MM-DD)
+- `type` (optional, string) - Фильтр: expense или income
+
+**Пример ответа:**
+```json
+{
+  "data": [
+    {
+      "category_id": 5,
+      "category_name": "Подписки",
+      "type": "expense",
+      "total_planned": 150000,
+      "total_paid": 100000,
+      "total_unpaid": 50000,
+      "occurrences_count": 3
+    }
+  ],
+  "period": { "from": "2026-03-01", "to": "2026-03-31" }
+}
+```
+
+### get-upcoming-occurrences
+
+Ближайшие неоплаченные вхождения. Просроченные (overdue) показываются первыми.
+
+**Параметры:**
+- `days` (optional, integer) - Дней вперед (default: 7, max: 365)
+- `limit` (optional, integer) - Максимум результатов (default: 20, max: 100)
+
+**Пример ответа:**
+```json
+{
+  "data": [
+    {
+      "recurring_id": 3,
+      "recurring_name": "Аренда",
+      "occurrence_date": "2026-03-15",
+      "amount": 3500000,
+      "type": "expense",
+      "category": { "id": 2, "name": "Жилье" },
+      "account": { "id": 1, "name": "Сбербанк" },
+      "is_paid": false,
+      "is_overdue": true,
+      "has_override": false,
+      "priority": "high"
+    }
+  ],
+  "total": 5
+}
+```
+
+**Пример использования:**
+```
+User: Что нужно оплатить на этой неделе?
+AI: [вызывает get-upcoming-occurrences с days: 7]
+    ⚠️ Просрочено:
+    - Аренда (15 марта) — 35 000 ₽
+
+    Предстоит:
+    - Netflix (20 марта) — 799 ₽
+    - Интернет (22 марта) — 500 ₽
+```
+
+---
+
+## 7. Occurrence Overrides (Пропуск/перенос)
+
+Overrides позволяют пропустить или перенести конкретное вхождение повторяющегося платежа без изменения самого расписания.
+
+### list-occurrence-overrides
+
+Все overrides для конкретного повторяющегося платежа.
+
+**Параметры:**
+- `recurring_id` (required, integer) - ID повторяющегося платежа
+
+**Пример ответа:**
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "recurring_id": 3,
+      "occurrence_date": "2026-04-01",
+      "type": "skip",
+      "new_date": null,
+      "overridden_amount": null,
+      "reason": "Отпуск",
+      "created_at": "2026-03-20T10:00:00Z"
+    }
+  ]
+}
+```
+
+### create-occurrence-override
+
+Пропустить или перенести вхождение.
+
+**Параметры:**
+- `recurring_id` (required, integer) - ID повторяющегося платежа
+- `occurrence_date` (required, string) - Дата вхождения (YYYY-MM-DD)
+- `type` (required, string) - Тип: `skip` (пропустить) или `reschedule` (перенести)
+- `new_date` (optional, string) - Новая дата (YYYY-MM-DD, обязательно для reschedule)
+- `reason` (optional, string) - Причина (max 500 символов)
+
+**Пример использования:**
+```
+User: Пропусти оплату аренды 1 апреля, я в отпуске
+AI: [вызывает create-occurrence-override]
+    recurring_id: 3
+    occurrence_date: "2026-04-01"
+    type: "skip"
+    reason: "Отпуск"
+    ✓ Вхождение 1 апреля пропущено.
+
+User: Перенеси оплату интернета с 15 на 20 марта
+AI: [вызывает create-occurrence-override]
+    recurring_id: 5
+    occurrence_date: "2026-03-15"
+    type: "reschedule"
+    new_date: "2026-03-20"
+    ✓ Оплата перенесена на 20 марта.
+```
+
+### delete-occurrence-override
+
+Отменить пропуск/перенос — вернуть вхождение в исходное расписание.
+
+**Параметры:**
+- `recurring_id` (required, integer) - ID повторяющегося платежа
+- `occurrence_date` (required, string) - Дата вхождения (YYYY-MM-DD)
+
+---
+
+## 8. Links (Привязка транзакций)
+
+Links связывают реальные транзакции с повторяющимися платежами. Когда транзакция привязана — вхождение считается оплаченным.
+
+### link-transaction-to-recurring
+
+Привязать транзакцию к повторяющемуся платежу (отметить как оплаченный).
+
+**Параметры:**
+- `recurring_id` (required, integer) - ID повторяющегося платежа
+- `transaction_id` (required, integer) - ID транзакции
+
+**Пример ответа:**
+```json
+{
+  "message": "Transaction linked successfully",
+  "recurring_id": 3,
+  "transaction_id": 42
+}
+```
+
+**Пример использования:**
+```
+User: Я оплатил аренду, транзакция 42 — это оплата по recurring 3
+AI: [вызывает link-transaction-to-recurring]
+    recurring_id: 3
+    transaction_id: 42
+    ✓ Транзакция привязана. Вхождение отмечено как оплаченное.
+```
+
+### unlink-transaction-from-recurring
+
+Отвязать транзакцию. Вхождение снова станет "не оплачено".
+
+**Параметры:**
+- `recurring_id` (required, integer) - ID повторяющегося платежа
+- `transaction_id` (required, integer) - ID транзакции
+
+---
+
+## 9. Tags (Теги)
 
 ### list-tags
 
@@ -425,7 +723,7 @@ AI: [вызывает delete-transaction с transaction_id: 42]
 
 ---
 
-## 7. Projects (Проекты)
+## 10. Projects (Проекты)
 
 ### list-projects
 
@@ -482,7 +780,90 @@ AI: [вызывает delete-transaction с transaction_id: 42]
 
 ---
 
-## 8. Metrics (Метрики)
+## 11. Dashboard (Статистика)
+
+### get-dashboard-stats
+
+Общая статистика: доходы, расходы, баланс за период.
+
+**Параметры:** нет (использует текущий месяц)
+
+---
+
+## 12. Pivot (Аналитика)
+
+Сводные таблицы (pivot tables) — аналитика по категориям за период. Показывают разбивку доходов/расходов по категориям и временным периодам.
+
+### get-dashboard-pivot
+
+Главная сводная таблица бюджета. Разбивка по категориям за период.
+
+**Параметры:**
+- `period` (required, string) - Период: week, month, quarter, year, custom
+- `from` (optional, string) - Дата начала (YYYY-MM-DD, обязательно для custom)
+- `to` (optional, string) - Дата окончания (YYYY-MM-DD, обязательно для custom)
+- `type` (optional, string) - Фильтр: expense или income
+- `account_id` (optional, integer) - Фильтр по счету
+
+**Пример использования:**
+```
+User: Покажи бюджет за март по категориям
+AI: [вызывает get-dashboard-pivot]
+    period: "month"
+    type: "expense"
+
+    Расходы за март:
+    - Жилье: 35 000 ₽
+    - Продукты: 15 000 ₽
+    - Транспорт: 5 000 ₽
+    Итого: 55 000 ₽
+```
+
+### get-project-pivot
+
+Сводная таблица по конкретному проекту и его подпроектам.
+
+**Параметры:**
+- `project_id` (required, integer) - ID проекта
+- `period` (required, string) - Период: week, month, quarter, year, custom
+- `from` (optional, string) - Дата начала (YYYY-MM-DD, обязательно для custom)
+- `to` (optional, string) - Дата окончания (YYYY-MM-DD, обязательно для custom)
+
+### get-subproject-pivot
+
+Разбивка по подпроектам внутри проекта.
+
+**Параметры:**
+- `project_id` (required, integer) - ID родительского проекта
+- `from` (optional, string) - Дата начала (YYYY-MM-DD, default: начало текущего месяца)
+- `to` (optional, string) - Дата окончания (YYYY-MM-DD, default: конец текущего месяца)
+- `base_currency` (optional, string) - Валюта конвертации (RUB, USD, EUR)
+
+**Пример ответа:**
+```json
+{
+  "subprojects": [
+    {
+      "project_id": 2,
+      "project_name": "Маркетинг",
+      "income": 0,
+      "expense": 150000,
+      "balance": -150000
+    },
+    {
+      "project_id": 3,
+      "project_name": "Разработка",
+      "income": 0,
+      "expense": 300000,
+      "balance": -300000
+    }
+  ]
+}
+```
+
+---
+
+## 13. Metrics (Метрики)
 
 Метрики — автоматически вычисляемые финансовые показатели проекта по периодам. Автометрики (income, expense, balance) материализуются из транзакций и запланированных платежей. Вычисляемые метрики (indicators) рассчитываются по формулам.
 
@@ -567,14 +948,6 @@ get-metrics-summary:
 - `from` (optional, string) - Дата начала (YYYY-MM-DD, default: 12 месяцев назад)
 - `to` (optional, string) - Дата окончания (YYYY-MM-DD, default: 6 месяцев вперед)
 
-**Пример использования:**
-```
-recompute-metrics:
-  project_id: 1
-  from: "2025-01-01"
-  to: "2026-06-30"
-```
-
 **Пример ответа:**
 ```json
 {
@@ -586,7 +959,7 @@ recompute-metrics:
 
 ---
 
-## 9. Indicators (Показатели)
+## 14. Indicators (Показатели)
 
 Индикаторы — вычисляемые показатели на основе формул, ссылающихся на другие метрики проекта. Например, "Чистый доход" = income - expense, или "НДФЛ 13%" = income * 0.13.
 
@@ -699,7 +1072,7 @@ recompute-metrics:
 
 ---
 
-## 10. Manual Metrics (Ручные метрики)
+## 15. Manual Metrics (Ручные метрики)
 
 Ручные метрики — пользовательские данные, вводимые вручную: количество клиентов, произвольные KPI и т.д. Серия создается автоматически при первой записи значения.
 
@@ -745,29 +1118,50 @@ store-manual-metric:
 
 ---
 
-## 11. Разработка новых Tools
+## 16. Currencies & Suggestions
+
+### list-currencies
+
+Получить список доступных валют для создания счетов.
+
+**Параметры:** нет
+
+### get-suggestions
+
+Автозаполнение описаний, категорий, тегов и счетов на основе истории транзакций.
+
+**Параметры:**
+- `query` (required, string) - Поисковый запрос
+
+---
+
+## 17. Разработка новых Tools
 
 ### Структура файлов
 
 ```
 app/Mcp/
 ├── Servers/
-│   └── FinTrackServer.php      # Регистрация tools (defaultPaginationLength = 100)
+│   └── EquityServer.php           # Регистрация tools (defaultPaginationLength = 100)
 ├── Tools/
-│   ├── Accounts/               # list, get, prepare, create, update, delete
-│   ├── Categories/             # list, get, prepare, create, update, delete
-│   ├── Transactions/           # list, get, prepare, create, update, delete, duplicate, transfer
-│   ├── Recurrings/             # list, get, prepare, create, update, delete, pause, resume, occurrences
-│   ├── Tags/                   # list, get, prepare, create, update, delete
-│   ├── Projects/               # list, get, prepare, create, update, delete
-│   ├── Metrics/                # get-range, get-monthly, get-summary, get-global, recompute
-│   ├── Indicators/             # list, get, prepare, create, update, delete, validate-expression
-│   ├── ManualMetrics/          # list, store
-│   ├── Dashboard/              # get-dashboard-stats
-│   ├── Currencies/             # list-currencies
-│   └── Suggestions/            # get-suggestions
+│   ├── Accounts/                  # list, get, prepare, create, update, delete
+│   ├── Categories/                # list, get, prepare, create, update, delete
+│   ├── Transactions/              # list, get, prepare, create, update, delete, duplicate, transfer
+│   ├── Recurrings/                # list, get, prepare, create, update, delete, pause, resume, occurrences
+│   ├── Occurrences/               # list, totals, by-category, upcoming
+│   ├── Overrides/                 # list, create, delete
+│   ├── Links/                     # link, unlink
+│   ├── Tags/                      # list, get, prepare, create, update, delete
+│   ├── Projects/                  # list, get, prepare, create, update, delete
+│   ├── Metrics/                   # get-range, get-monthly, get-summary, get-global, recompute
+│   ├── Indicators/                # list, get, prepare, create, update, delete, validate-expression
+│   ├── ManualMetrics/             # list, store
+│   ├── Dashboard/                 # get-dashboard-stats
+│   ├── Pivot/                     # dashboard, project, subproject
+│   ├── Currencies/                # list-currencies
+│   └── Suggestions/               # get-suggestions
 └── Validation/
-    ├── AccountRules.php        # create() + update() методы
+    ├── AccountRules.php           # create() + update() методы
     ├── CategoryRules.php
     ├── TransactionRules.php
     ├── RecurringRules.php
@@ -847,7 +1241,7 @@ class My{Entity}Tool extends Tool
 
 ### Регистрация Tool
 
-Добавь класс в `FinTrackServer::$tools`:
+Добавь класс в `EquityServer::$tools`:
 
 ```php
 protected array $tools = [
@@ -859,7 +1253,7 @@ protected array $tools = [
 ### Ограничение пагинации
 
 По умолчанию Laravel MCP показывает только 15 tools.
-В `FinTrackServer` увеличено до 100 (покрывает все 58 tools):
+В `EquityServer` увеличено до 100 (покрывает все 70 tools):
 
 ```php
 public int $defaultPaginationLength = 100;
@@ -872,17 +1266,14 @@ public int $defaultPaginationLength = 100;
 ### Проверка количества доступных tools
 
 ```bash
-# Продакшн
 MCP_URL="https://api.equity.su/mcp"
-# Локальная
-# MCP_URL="http://fintrack.test/mcp"
 
 curl -s -X POST $MCP_URL \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
   | jq '.result.tools | length'
-# Ожидаем: 58
+# Ожидаем: 70
 ```
 
 ### Тестовый вызов
@@ -900,10 +1291,4 @@ curl -s -X POST https://api.equity.su/mcp \
       "arguments":{"from_date":"2026-02-01","to_date":"2026-02-28","limit":10}
     }
   }' | jq '.result.content[0].text' | jq .
-```
-
-### Логи
-
-```bash
-tail -f storage/logs/laravel.log | grep -i mcp
 ```
