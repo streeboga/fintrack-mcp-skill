@@ -6,7 +6,7 @@ February 2026
 
 > **Примечание:**
 > Этот документ предназначен для AI агентов и LLM при работе с MCP сервером FinTrack.
-> Содержит детальные примеры использования всех 30 инструментов.
+> Содержит детальные примеры использования всех 58 инструментов.
 
 ---
 
@@ -18,7 +18,11 @@ February 2026
 4. [Transactions (Транзакции)](#4-transactions-транзакции)
 5. [Recurring Payments (Повторяющиеся платежи)](#5-recurring-payments-повторяющиеся-платежи)
 6. [Tags (Теги)](#6-tags-теги)
-7. [Разработка новых Tools](#7-разработка-новых-tools)
+7. [Projects (Проекты)](#7-projects-проекты)
+8. [Metrics (Метрики)](#8-metrics-метрики)
+9. [Indicators (Показатели)](#9-indicators-показатели)
+10. [Manual Metrics (Ручные метрики)](#10-manual-metrics-ручные-метрики)
+11. [Разработка новых Tools](#11-разработка-новых-tools)
 
 ---
 
@@ -478,20 +482,290 @@ AI: [вызывает delete-transaction с transaction_id: 42]
 
 ---
 
-## 8. Разработка новых Tools
+## 8. Metrics (Метрики)
+
+Метрики — автоматически вычисляемые финансовые показатели проекта по периодам. Автометрики (income, expense, balance) материализуются из транзакций и запланированных платежей. Вычисляемые метрики (indicators) рассчитываются по формулам.
+
+### get-metrics-range
+
+Получить все значения метрик проекта за диапазон дат.
+
+**Параметры:**
+- `project_id` (required, integer) - ID проекта
+- `from` (required, string) - Дата начала (YYYY-MM-DD)
+- `to` (required, string) - Дата окончания (YYYY-MM-DD)
+- `scenario` (optional, string) - Сценарий (default: baseline)
+- `compute` (optional, boolean) - Пересчитать вычисляемые метрики перед чтением (default: true)
+
+**Пример использования:**
+```
+get-metrics-range:
+  project_id: 1
+  from: "2026-01-01"
+  to: "2026-03-31"
+  scenario: "baseline"
+  compute: true
+```
+
+### get-metrics-monthly
+
+Получить помесячный тренд для конкретной метрики, с возможностью сравнения сценариев.
+
+**Параметры:**
+- `project_id` (required, integer) - ID проекта
+- `key` (required, string) - Суффикс ключа метрики (например: "income", "expense"). Автоматически превращается в `p:{project_id}:{key}`
+- `months` (optional, integer) - Количество месяцев назад (default: 12, max: 60)
+- `scenarios` (optional, array) - Массив сценариев для сравнения. Если не указано или один — простой тренд
+
+**Пример использования:**
+```
+get-metrics-monthly:
+  project_id: 1
+  key: "income"
+  months: 6
+  scenarios: ["baseline", "optimistic"]
+```
+
+### get-metrics-summary
+
+Получить сводку метрик: текущий месяц vs прошлый месяц с процентом изменения.
+
+**Параметры:**
+- `project_id` (required, integer) - ID проекта
+- `keys` (optional, array) - Массив суффиксов ключей метрик (например: ["income", "expense"]). Если не указано — все метрики проекта
+
+**Пример использования:**
+```
+get-metrics-summary:
+  project_id: 1
+  keys: ["income", "expense", "balance"]
+```
+
+### get-global-metrics
+
+Получить глобальные метрики по всем проектам: income, expense, balance.
+
+**Параметры:** нет
+
+**Пример ответа:**
+```json
+{
+  "summaries": [
+    { "key": "g:income", "current": 500000, "prev_month": 450000, "change_pct": 11.1 },
+    { "key": "g:expense", "current": 300000, "prev_month": 280000, "change_pct": 7.1 },
+    { "key": "g:balance", "current": 200000, "prev_month": 170000, "change_pct": 17.6 }
+  ]
+}
+```
+
+### recompute-metrics
+
+Пересчитать все метрики проекта: материализовать из транзакций и пересчитать формулы. Используй после массовых изменений данных.
+
+**Параметры:**
+- `project_id` (required, integer) - ID проекта
+- `from` (optional, string) - Дата начала (YYYY-MM-DD, default: 12 месяцев назад)
+- `to` (optional, string) - Дата окончания (YYYY-MM-DD, default: 6 месяцев вперед)
+
+**Пример использования:**
+```
+recompute-metrics:
+  project_id: 1
+  from: "2025-01-01"
+  to: "2026-06-30"
+```
+
+**Пример ответа:**
+```json
+{
+  "materialized": 156,
+  "computed": 12,
+  "duration_ms": 234
+}
+```
+
+---
+
+## 9. Indicators (Показатели)
+
+Индикаторы — вычисляемые показатели на основе формул, ссылающихся на другие метрики проекта. Например, "Чистый доход" = income - expense, или "НДФЛ 13%" = income * 0.13.
+
+### Синтаксис формул
+
+- **Ссылки на метрики**: `p{p}:income`, `p{p}:expense`, `p{p}:balance` (где `{p}` заменяется на ID проекта)
+- **Ссылки на другие индикаторы**: `i:p{p}:suffix`
+- **Операторы**: `+`, `-`, `*`, `/`
+- **Скобки**: `(a + b) * c`
+- **Функции**: `max()`, `min()`, `abs()`, `round()`
+
+**Примеры формул:**
+- Чистый доход: `p{p}:income - p{p}:expense`
+- НДФЛ 13%: `p{p}:income * 0.13`
+- Норма сбережений: `(p{p}:income - p{p}:expense) / p{p}:income`
+
+### list-indicators
+
+Получить все индикаторы проекта.
+
+**Параметры:**
+- `project_id` (required, integer) - ID проекта
+
+### get-indicator
+
+Получить детали индикатора.
+
+**Параметры:**
+- `project_id` (required, integer) - ID проекта
+- `indicator_id` (required, integer) - ID индикатора
+
+### prepare-indicator
+
+Валидация данных и предпросмотр перед созданием индикатора. **Всегда вызывай перед create-indicator.**
+
+**Параметры:**
+- `project_id` (required, integer) - ID проекта
+- `suffix` (required, string) - Уникальный суффикс ключа (lowercase, цифры, подчеркивания; начинается с буквы). Пример: "net_income"
+- `name` (required, string) - Человекочитаемое название
+- `expression` (required, string) - Формула. Используй `{p}` как плейсхолдер ID проекта
+- `unit` (optional, string) - Единица измерения: money, percent, number (default: money)
+- `display_format` (optional, string) - Формат отображения: currency, percent, number (default: currency)
+- `icon` (optional, string) - Идентификатор иконки
+- `color` (optional, string) - Цвет в HEX: #FF5733
+- `sort_order` (optional, integer) - Порядок сортировки (default: 0)
+- `show_scenario_diff` (optional, boolean) - Показывать сравнение сценариев (default: false)
+
+**Пример создания индикатора:**
+```
+1. prepare-indicator:
+   project_id: 1
+   suffix: "net_income"
+   name: "Чистый доход"
+   expression: "p{p}:income - p{p}:expense"
+   unit: "money"
+   display_format: "currency"
+
+2. [показать preview, получить подтверждение]
+
+3. create-indicator с теми же данными
+```
+
+### create-indicator
+
+Создать индикатор (после prepare-indicator и подтверждения пользователя).
+
+Параметры те же что и prepare-indicator.
+
+### update-indicator
+
+Обновить индикатор. Передавай только изменяемые поля.
+
+**Параметры:**
+- `project_id` (required, integer) - ID проекта
+- `indicator_id` (required, integer) - ID индикатора
+- `name` (optional, string) - Новое название
+- `expression` (optional, string) - Новая формула. Используй `{p}` как плейсхолдер
+- `unit` (optional, string) - Единица: money, percent, number
+- `display_format` (optional, string) - Формат: currency, percent, number
+- `icon` (optional, string) - Иконка
+- `color` (optional, string) - Цвет в HEX
+- `sort_order` (optional, integer) - Порядок сортировки
+- `show_scenario_diff` (optional, boolean) - Показывать сравнение сценариев
+
+### delete-indicator
+
+Удалить индикатор. Нельзя удалить если другие индикаторы зависят от него.
+
+**Параметры:**
+- `project_id` (required, integer) - ID проекта
+- `indicator_id` (required, integer) - ID индикатора
+
+### validate-expression
+
+Проверить формулу без создания индикатора. Полезно для отладки выражений.
+
+**Параметры:**
+- `project_id` (required, integer) - ID проекта
+- `expression` (required, string) - Формула для проверки. Используй `{p}` как плейсхолдер
+- `own_key` (optional, string) - Ключ редактируемого индикатора (исключить из проверки циклических зависимостей)
+
+**Пример ответа:**
+```json
+{
+  "valid": true,
+  "errors": [],
+  "dependencies": ["p:1:income", "p:1:expense"]
+}
+```
+
+---
+
+## 10. Manual Metrics (Ручные метрики)
+
+Ручные метрики — пользовательские данные, вводимые вручную: количество клиентов, произвольные KPI и т.д. Серия создается автоматически при первой записи значения.
+
+### list-manual-metrics
+
+Получить все ручные метрики проекта.
+
+**Параметры:**
+- `project_id` (required, integer) - ID проекта
+
+### store-manual-metric
+
+Записать значение ручной метрики. Серия создается автоматически если не существует (upsert по ключу+периоду).
+
+**Параметры:**
+- `project_id` (required, integer) - ID проекта
+- `key` (required, string) - Ключ метрики (например: "u:p5:clients")
+- `period` (required, string) - Дата периода (YYYY-MM-DD)
+- `value` (required, integer) - Значение метрики (целое число)
+
+**Пример использования:**
+```
+store-manual-metric:
+  project_id: 5
+  key: "u:p5:clients"
+  period: "2026-03-01"
+  value: 42
+```
+
+**Пример ответа:**
+```json
+{
+  "success": true,
+  "message": "Manual metric value stored successfully",
+  "metric_value": {
+    "key": "u:p5:clients",
+    "date": "2026-03-01",
+    "value": 42,
+    "source": "manual"
+  }
+}
+```
+
+---
+
+## 11. Разработка новых Tools
 
 ### Структура файлов
 
 ```
 app/Mcp/
 ├── Servers/
-│   └── FinTrackServer.php      # Регистрация tools (defaultPaginationLength = 50)
+│   └── FinTrackServer.php      # Регистрация tools (defaultPaginationLength = 100)
 ├── Tools/
 │   ├── Accounts/               # list, get, prepare, create, update, delete
 │   ├── Categories/             # list, get, prepare, create, update, delete
-│   ├── Transactions/           # list, get, prepare, create, update, delete
-│   ├── Recurrings/             # list, get, prepare, create, update, delete
-│   └── Tags/                   # list, get, prepare, create, update, delete
+│   ├── Transactions/           # list, get, prepare, create, update, delete, duplicate, transfer
+│   ├── Recurrings/             # list, get, prepare, create, update, delete, pause, resume, occurrences
+│   ├── Tags/                   # list, get, prepare, create, update, delete
+│   ├── Projects/               # list, get, prepare, create, update, delete
+│   ├── Metrics/                # get-range, get-monthly, get-summary, get-global, recompute
+│   ├── Indicators/             # list, get, prepare, create, update, delete, validate-expression
+│   ├── ManualMetrics/          # list, store
+│   ├── Dashboard/              # get-dashboard-stats
+│   ├── Currencies/             # list-currencies
+│   └── Suggestions/            # get-suggestions
 └── Validation/
     ├── AccountRules.php        # create() + update() методы
     ├── CategoryRules.php
@@ -585,10 +859,10 @@ protected array $tools = [
 ### Ограничение пагинации
 
 По умолчанию Laravel MCP показывает только 15 tools.
-В `FinTrackServer` увеличено до 50 (покрывает все 30 tools):
+В `FinTrackServer` увеличено до 100 (покрывает все 58 tools):
 
 ```php
-public int $defaultPaginationLength = 50;
+public int $defaultPaginationLength = 100;
 ```
 
 ---
@@ -608,7 +882,7 @@ curl -s -X POST $MCP_URL \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
   | jq '.result.tools | length'
-# Ожидаем: 36
+# Ожидаем: 58
 ```
 
 ### Тестовый вызов
